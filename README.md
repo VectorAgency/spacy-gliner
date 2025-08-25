@@ -1,0 +1,239 @@
+# spacy-gliner
+
+A modular spaCy pipeline for PII detection and anonymization using GLiNER's state-of-the-art entity recognition model. Features smart entity resolution with fuzzy matching to catch all entity variations, including possessive forms and missed occurrences.
+
+## Features
+
+- 🔍 **Multilingual PII Detection**: Optimized for German text, supports multiple languages
+- 🤖 **spaCy Integration**: Runs as native spaCy component in standard NLP pipelines
+- 🔗 **Entity Resolution**: Smart coreference resolution (links "Anna" with "Anna Meier")
+- 🎨 **Fuzzy Matching**: Catches ALL entity variations including possessive forms ("Annas")
+- 🔒 **Document Anonymization**: Replace PII with placeholders like `[PERSON_0]`
+- 🚀 **Efficient Processing**: Chunks large documents to avoid truncation
+- 🎯 **Configurable Filtering**: Remove false positives with customizable filter lists
+- 💾 **Model Caching**: Caches model locally for faster subsequent runs
+- 📊 **Multiple Output Formats**: spaCy JSON, anonymized text with entity mappings
+
+## Installation
+
+### Option 1: Conda environment (recommended)
+
+```bash
+conda env create -f environment.yml
+conda activate spacy-gliner
+```
+
+### Option 2: pip install
+
+```bash
+pip install -r requirements.txt
+```
+
+## Usage
+
+### Basic extraction (spaCy JSON output)
+```bash
+python extract_pii.py --filter
+```
+
+### Anonymize document with entity resolution
+```bash
+python extract_pii.py --anonymize --filter --resolve-entities
+```
+This intelligently groups entities: "Anna" and "Anna Meier" → `[PERSON_0]`
+
+### Save output to file
+```bash
+python extract_pii.py --anonymize --filter --resolve-entities --output results.json
+```
+Saves the anonymized output to `results.json` instead of printing to stdout
+
+
+### Python API usage
+```python
+from pii_detector import create_pipeline, anonymize_doc
+
+# Create pipeline
+nlp = create_pipeline(language="de", filter_false_positives=True)
+
+# Process text
+doc = nlp(text)
+
+# Basic anonymization
+anonymized_text, mapping = anonymize_doc(doc, resolve_entities=True)
+
+# Custom label mapping (person → NAME, organization → COMPANY)
+label_mapping = {
+    "person": "NAME",
+    "organization": "COMPANY",
+    "location": "PLACE"
+}
+anonymized_text, mapping = anonymize_doc(
+    doc, 
+    label_mapping=label_mapping,
+    placeholder_format="<<{label}#{id}>>"  # → <<NAME#0>>
+)
+```
+
+## Command-line Arguments
+
+| Argument | Default | Description |
+|----------|---------|-------------|
+| `--input` | data/text.txt | Input text file |
+| `--output` | stdout | Output file |
+| `--threshold` | 0.3 | Confidence threshold (0.0-1.0) |
+| `--filter` | False | Apply false positive filtering |
+| `--filter-file` | data/false_positives.json | JSON file with false positives |
+| `--anonymize` | False | Output anonymized text with placeholders |
+| `--resolve-entities` | False | Resolve coreferences when anonymizing |
+| `--language` | de | Language code (de, en, etc.) |
+
+## Detected Entity Types
+
+- **person**: Names of individuals
+- **organization**: Companies, institutions
+- **location**: Cities, regions
+- **country**: Country names
+- **email**: Email addresses
+- **phone_number**: Phone numbers
+- **birthdate**: Dates of birth
+- **address**: Physical addresses
+
+## False Positive Filtering
+
+Edit `false_positives.json` to customize filtering:
+
+```json
+{
+  "person": [
+    "Mutter",  // Generic family terms
+    "Eltern",
+    "Patient"  // Generic roles
+  ],
+  "organization": [
+    "Schule",  // Generic institutions
+    "Krankenhaus"
+  ]
+}
+```
+
+## Output Formats
+
+### 1. Standard spaCy JSON
+```json
+{
+  "text": "...",
+  "ents": [
+    {"start": 44, "end": 54, "label": "person"}
+  ],
+  "sents": [{"start": 0, "end": 24}],
+  "tokens": [...]
+}
+```
+
+### 2. Anonymized Output (with entity resolution)
+```json
+{
+  "anonymized_text": "Name der Patientin: [PERSON_0]\n...",
+  "entity_mapping": {
+    "[PERSON_0]": "Anna Meier",  // All "Anna" references map to PERSON_0
+    "[PERSON_1]": "Dr. med. Marco Weber",
+    "[ORGANIZATION_0]": "Gemeinschaftspraxis Bellevue"
+  },
+  "statistics": {
+    "total_entities": 41,
+    "entity_resolution": "enabled"
+  }
+}
+```
+
+
+## Project Structure
+
+| Directory/File | Description |
+|------|-------------|
+| `pii_detector/` | Main package with modular components |
+| `├── detector.py` | spaCy component with GLiNER integration |
+| `├── anonymizer.py` | Anonymization and entity resolution |
+| `├── fuzzy_matcher.py` | Fuzzy matching for entity variations |
+| `├── config.py` | Configuration and label mappings |
+| `└── utils.py` | Shared utilities and model loading |
+| `data/` | Data files directory |
+| `├── false_positives.json` | List of terms to filter out |
+| `├── gold_dataset.json` | Reference dataset of known PII entities |
+| `└── text.txt` | Sample input text (German psychological report) |
+| `extract_pii.py` | CLI script |
+| `environment.yml` | Conda environment configuration |
+
+## Performance
+
+- Processes ~1200 characters per chunk to stay within model limits
+- F1 score: ~0.75 on German psychological reports
+- Recall: ~70-80% for core PII entities
+- Precision: High with filtering enabled
+
+## Technical Details
+
+### How Anonymization Labels Work
+
+The labels like `[PERSON_0]` are created through this process:
+
+1. **GLiNER Detection**: Detects entities with labels: person, organization, location, etc.
+2. **Label Transformation**: `person` → `PERSON` (uppercase)
+3. **ID Assignment**: 
+   - Without resolution: Sequential (`[PERSON_0]`, `[PERSON_1]`, `[PERSON_2]`)
+   - With resolution: Same ID for coreferent entities (all "Anna" → `[PERSON_0]`)
+4. **Placeholder Format**: Default `[{label}_{id}]` but customizable
+
+### Customizing Labels
+
+You can customize labels in multiple ways:
+
+```python
+# 1. Change label names (config.py or via API)
+label_mapping = {
+    "person": "NAME",
+    "organization": "COMPANY",
+    "email": "CONTACT_EMAIL"
+}
+
+# 2. Change placeholder format
+placeholder_format = "<<{label}#{id}>>"      # <<NAME#0>>
+placeholder_format = "{{{label}_{id}}}"       # {NAME_0}
+placeholder_format = "***{label}_{id}***"     # ***NAME_0***
+
+# 3. Add new entity types (in utils.py)
+DEFAULT_LABELS = ["person", "organization", "location", "ssn", "credit_card"]
+```
+
+### Entity Resolution & Fuzzy Matching
+The anonymizer uses two-phase matching for comprehensive coverage:
+
+**Phase 1: Entity Resolution** (groups related entities)
+- **Exact match**: "Anna" == "Anna" → same entity
+- **Subset matching**: "Anna" ⊂ "Anna Meier" → same entity  
+- **Works for person names only** (avoids false matches for organizations)
+
+**Phase 2: Fuzzy Matching** (catches ALL variations)
+- **Possessive forms**: "Annas" (German genitive) → matches "Anna"
+- **Case variations**: "anna", "ANNA" → matches "Anna"
+- **Missed occurrences**: Finds entities GLiNER didn't detect
+- **Word boundaries**: Respects word boundaries to avoid false matches
+
+### Processing Pipeline
+1. Text is chunked (1400 chars with 200 char overlap)
+2. GLiNER extracts entities from each chunk
+3. Duplicates are removed based on position proximity
+4. Optional false positive filtering applied
+5. Entities converted to spaCy spans
+6. Optional entity resolution groups coreferent mentions
+
+### Notes
+- **First run downloads the model (~500MB)**, cached locally afterwards
+- Model cache (`gliner_model_cache.pkl`) is created automatically
+- Works best with **English entity labels** (model training language)
+- German text is fully supported for extraction
+
+## License
+
+This tool uses the GLiNER model (Apache 2.0 License)

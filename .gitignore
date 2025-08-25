@@ -1,0 +1,43 @@
+# Cached model file (downloaded automatically on first run)
+gliner_model_cache.pkl
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# Virtual environments
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+
+# Output files
+results*.json
+pii_results.json
+pii_extraction_results.json
+anonymized_*.json
+*.output.json
+
+# Test files
+test_*.py
+*_test.py
+
+# Jupyter
+.ipynb_checkpoints/
+*.ipynb
+
+# Temporary files
+*.tmp
+*.bak
+*~

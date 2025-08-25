@@ -1,0 +1,101 @@
+{
+  "entities": [
+    {
+      "text": "Bergstrasse 12",
+      "label": "address"
+    },
+    {
+      "text": "Deutschland",
+      "label": "country"
+    },
+    {
+      "text": "Schweiz",
+      "label": "country"
+    },
+    {
+      "text": "01.01.2008",
+      "label": "birthdate"
+    },
+    {
+      "text": "info@psychologie-schneider.ch",
+      "label": "email"
+    },
+    {
+      "text": "Bellevue",
+      "label": "location"
+    },
+    {
+      "text": "Gemeinschaftspraxis Bellevue",
+      "label": "organization"
+    },
+    {
+      "text": "Zeugen Jehovas",
+      "label": "organization"
+    },
+    {
+      "text": "Adrian",
+      "label": "person"
+    },
+    {
+      "text": "Anna",
+      "label": "person"
+    },
+    {
+      "text": "Anna Meier",
+      "label": "person"
+    },
+    {
+      "text": "Dr. med. Marco Weber",
+      "label": "person"
+    },
+    {
+      "text": "Dr. phil. Julia Schneider",
+      "label": "person"
+    },
+    {
+      "text": "Julia Schneider",
+      "label": "person"
+    },
+    {
+      "text": "Leonie",
+      "label": "person"
+    },
+    {
+      "text": "Blacky",
+      "label": "pet"
+    },
+    {
+      "text": "044 123 45 67",
+      "label": "phone_number"
+    }
+  ],
+  "metadata": {
+    "total_unique_entities": 17,
+    "entity_types": [
+      "address",
+      "birthdate",
+      "country",
+      "email",
+      "location",
+      "organization",
+      "person",
+      "pet",
+      "phone_number"
+    ],
+    "entity_counts": {
+      "address": 1,
+      "country": 2,
+      "birthdate": 1,
+      "email": 1,
+      "location": 1,
+      "organization": 2,
+      "person": 7,
+      "pet": 1,
+      "phone_number": 1
+    },
+    "created": "2025-08-25",
+    "document_type": "psychological_report",
+    "language": "German",
+    "note": "Core PII entities only - for anonymization purposes"
+  }
+}
