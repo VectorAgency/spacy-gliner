@@ -66,13 +66,14 @@ class PiiDetector:
         text = doc.text
         
         # Initialize metadata storage
+        from .config import GLINER_MODEL_NAME
         metadata = {
             'chunk_boundaries': [],
             'filtered_false_positives': [],
             'overlapping_entities_removed': [],
             'all_raw_entities': [],
             'model_info': {
-                'name': 'urchade/gliner_multi_pii-v1',
+                'name': GLINER_MODEL_NAME,
                 'threshold': self.threshold,
                 'chunk_size': self.chunk_size,
                 'overlap': self.overlap

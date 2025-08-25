@@ -6,7 +6,13 @@ import os
 import json
 from typing import List, Dict, Any, Optional
 from gliner import GLiNER
-from .config import DEFAULT_LABELS, DEFAULT_CHUNK_SIZE, DEFAULT_OVERLAP, DEFAULT_THRESHOLD
+from .config import (
+    DEFAULT_LABELS, 
+    DEFAULT_CHUNK_SIZE, 
+    DEFAULT_OVERLAP, 
+    DEFAULT_THRESHOLD,
+    GLINER_MODEL_NAME
+)
 
 # Global model cache (singleton pattern)
 _cached_model: Optional[GLiNER] = None
@@ -27,7 +33,8 @@ def load_gliner_model() -> GLiNER:
     if _cached_model is None:
         # Model will be cached by HuggingFace transformers library
         # in ~/.cache/huggingface/hub/ automatically
-        _cached_model = GLiNER.from_pretrained("urchade/gliner_multi_pii-v1")
+        print(f"Loading GLiNER model: {GLINER_MODEL_NAME}")
+        _cached_model = GLiNER.from_pretrained(GLINER_MODEL_NAME)
     
     return _cached_model
 
