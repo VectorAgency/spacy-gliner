@@ -49,10 +49,13 @@ class PiiDetector:
         if not Span.has_extension("confidence"):
             Span.set_extension("confidence", default=None)
         
-        # Load false positives filter
+        # Load false positives filter (convert to lowercase for case-insensitive matching)
         self.false_positives = {}
         if filter_false_positives:
-            self.false_positives = load_false_positives(filter_file)
+            fp_data = load_false_positives(filter_file)
+            # Convert all false positives to lowercase for case-insensitive matching
+            for label, terms in fp_data.items():
+                self.false_positives[label] = set(term.lower() for term in terms)
     
     def __call__(self, doc: Doc) -> Doc:
         """Process a spaCy Doc"""
@@ -106,16 +109,16 @@ class PiiDetector:
         return deduplicate_entities(all_entities)
     
     def _filter_entities(self, entities: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-        """Filter out known false positives"""
+        """Filter out known false positives (case-insensitive)"""
         filtered = []
         
         for entity in entities:
             label = entity['label']
-            text = entity['text'].strip()
+            text_lower = entity['text'].strip().lower()
             
-            # Check if it's in false positives list
+            # Check if it's in false positives list (case-insensitive)
             if label in self.false_positives:
-                if text in self.false_positives[label]:
+                if text_lower in self.false_positives[label]:
                     continue
             
             filtered.append(entity)
@@ -123,40 +126,21 @@ class PiiDetector:
         return filtered
     
     def _char_to_token_span(self, doc: Doc, start_char: int, end_char: int, label: str, score: float) -> Span:
-        """Convert character offsets to token span"""
-        start_token = None
-        end_token = None
+        """Convert character offsets to token span using spaCy's built-in method"""
+        # Use spaCy's built-in char_span method with contract alignment mode
+        # This ensures we don't extend beyond the actual entity boundaries
+        span = doc.char_span(start_char, end_char, label=label, alignment_mode="contract")
         
-        # Find token boundaries
-        for token in doc:
-            if start_token is None and token.idx <= start_char < token.idx + len(token.text):
-                start_token = token.i
-            if token.idx < end_char <= token.idx + len(token.text):
-                end_token = token.i + 1
-                break
-            if token.idx >= end_char:
-                end_token = token.i
-                break
+        if span:
+            # Store the GLiNER confidence score on the span
+            span._.confidence = score
+            return span
         
-        # Fallback for boundary cases
-        if start_token is None:
-            for token in doc:
-                if token.idx >= start_char:
-                    start_token = token.i
-                    break
-        
-        if end_token is None:
-            end_token = len(doc)
-        
-        # Create span if valid
-        if start_token is not None and end_token is not None and start_token < end_token:
-            try:
-                span = Span(doc, start_token, end_token, label=label)
-                # Store the GLiNER confidence score on the span
-                span._.confidence = score
-                return span
-            except Exception:
-                return None
+        # Fallback to expand mode if contract didn't work
+        span = doc.char_span(start_char, end_char, label=label, alignment_mode="expand")
+        if span:
+            span._.confidence = score
+            return span
         
         return None
 

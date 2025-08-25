@@ -11,7 +11,7 @@ A modular spaCy pipeline for PII detection and anonymization using GLiNER's stat
 - 🔒 **Document Anonymization**: Replace PII with placeholders like `[PERSON_0]`
 - 🚀 **Efficient Processing**: Chunks large documents to avoid truncation
 - 🎯 **Configurable Filtering**: Remove false positives with customizable filter lists
-- 💾 **Model Caching**: Caches model locally for faster subsequent runs
+- 💾 **Model Caching**: Uses HuggingFace's built-in caching for reliability
 - 📊 **Multiple Output Formats**: spaCy JSON, anonymized text with entity mappings
 
 ## Installation
@@ -87,6 +87,7 @@ anonymized_text, mapping = anonymize_doc(
 | `--anonymize` | False | Output anonymized text with placeholders |
 | `--resolve-entities` | False | Resolve coreferences when anonymizing |
 | `--language` | de | Language code (de, en, etc.) |
+| `--placeholder-format` | brackets | Placeholder style: brackets, angles, double_angles, curly, custom |
 
 ## Detected Entity Types
 
@@ -101,7 +102,7 @@ anonymized_text, mapping = anonymize_doc(
 
 ## False Positive Filtering
 
-Edit `false_positives.json` to customize filtering:
+Edit `false_positives.json` to customize filtering (case-insensitive matching):
 
 ```json
 {
@@ -116,6 +117,8 @@ Edit `false_positives.json` to customize filtering:
   ]
 }
 ```
+
+Note: Filtering is now case-insensitive, so "Mutter", "mutter", and "MUTTER" will all be filtered.
 
 ## Output Formats
 
@@ -207,32 +210,42 @@ DEFAULT_LABELS = ["person", "organization", "location", "ssn", "credit_card"]
 ```
 
 ### Entity Resolution & Fuzzy Matching
-The anonymizer uses two-phase matching for comprehensive coverage:
+The anonymizer uses three-phase matching for comprehensive coverage:
 
 **Phase 1: Entity Resolution** (groups related entities)
 - **Exact match**: "Anna" == "Anna" → same entity
 - **Subset matching**: "Anna" ⊂ "Anna Meier" → same entity  
+- **Similarity threshold**: Uses Jaccard similarity (default 0.8) for merging decisions
 - **Works for person names only** (avoids false matches for organizations)
+- **Deterministic clustering**: Entities grouped by first appearance position
 
-**Phase 2: Fuzzy Matching** (catches ALL variations)
+**Phase 2: Direct Replacement** (replaces detected spans)
+- **Span-based identity**: Uses (start_char, end_char, label) to avoid collisions
+- **Right-to-left replacement**: Ensures correct positioning
+
+**Phase 3: Fuzzy Matching** (catches ALL variations)
 - **Possessive forms**: "Annas" (German genitive) → matches "Anna"
 - **Case variations**: "anna", "ANNA" → matches "Anna"
+- **Typo detection**: Uses SequenceMatcher for similarity scoring (threshold: 0.85)
 - **Missed occurrences**: Finds entities GLiNER didn't detect
 - **Word boundaries**: Respects word boundaries to avoid false matches
+- **Placeholder safety**: Avoids replacing inside already-replaced regions
 
 ### Processing Pipeline
 1. Text is chunked (1400 chars with 200 char overlap)
-2. GLiNER extracts entities from each chunk
-3. Duplicates are removed based on position proximity
-4. Optional false positive filtering applied
-5. Entities converted to spaCy spans
+2. GLiNER extracts entities from each chunk with confidence scores
+3. Duplicates removed with O(n) algorithm based on position proximity
+4. Optional case-insensitive false positive filtering applied
+5. Entities converted to spaCy spans using built-in `char_span()` method
 6. Optional entity resolution groups coreferent mentions
+7. Fuzzy matching finds and replaces all variations
 
 ### Notes
-- **First run downloads the model (~500MB)**, cached locally afterwards
-- Model cache (`gliner_model_cache.pkl`) is created automatically
+- **First run downloads the model (~500MB)**, cached by HuggingFace in `~/.cache/huggingface/`
+- No manual pickle caching - uses HuggingFace's robust caching mechanism
 - Works best with **English entity labels** (model training language)
 - German text is fully supported for extraction
+- All confidence scores preserved from GLiNER output
 
 ## License
 

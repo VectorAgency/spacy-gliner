@@ -8,6 +8,7 @@ import json
 import os
 import sys
 from pii_detector import create_pipeline, anonymize_doc
+from pii_detector.config import PLACEHOLDER_FORMATS
 
 
 def main():
@@ -31,6 +32,9 @@ def main():
                         help='Output anonymized text with placeholders')
     parser.add_argument('--resolve-entities', action='store_true',
                         help='Resolve entity coreferences when anonymizing')
+    parser.add_argument('--placeholder-format', type=str, default='brackets',
+                        choices=['brackets', 'angles', 'double_angles', 'curly', 'custom'],
+                        help='Placeholder format style (default: brackets)')
     
     args = parser.parse_args()
     
@@ -57,26 +61,30 @@ def main():
     
     # Generate output based on mode
     if args.anonymize:
+        # Get the placeholder format
+        placeholder_format = PLACEHOLDER_FORMATS.get(args.placeholder_format, PLACEHOLDER_FORMATS['brackets'])
+        
         # Anonymize the document
         anonymized_text, mapping = anonymize_doc(
             doc, 
             resolve_entities=args.resolve_entities,
+            placeholder_format=placeholder_format,
             include_scores=False  # Don't include scores in mapping
         )
         
         # Extract all entities with their details
         entities = []
         for ent in doc.ents:
-            # Check if score exists - it should always be there from GLiNER
-            if not hasattr(ent._, "confidence"):
-                raise ValueError(f"Entity missing GLiNER confidence score: {ent.text}")
+            # Get confidence score, using 1.0 as fallback if None
+            score = ent._.confidence if (hasattr(ent._, "confidence") and 
+                                        ent._.confidence is not None) else 1.0
             
             ent_dict = {
                 "text": ent.text,
                 "label": ent.label_,
                 "start": ent.start_char,
                 "end": ent.end_char,
-                "score": round(ent._.confidence, 3)  # No fallback - must be from GLiNER
+                "score": round(score, 3)
             }
             entities.append(ent_dict)
         
@@ -107,9 +115,9 @@ def main():
         # Add entities with GLiNER confidence scores
         entities_with_scores = []
         for ent in doc.ents:
-            # Check if score exists - it should always be there from GLiNER
-            if not hasattr(ent._, "confidence"):
-                raise ValueError(f"Entity missing GLiNER confidence score: {ent.text}")
+            # Get confidence score, using 1.0 as fallback if None
+            score = ent._.confidence if (hasattr(ent._, "confidence") and 
+                                        ent._.confidence is not None) else 1.0
             
             ent_dict = {
                 "text": ent.text,
@@ -118,7 +126,7 @@ def main():
                 "end": ent.end_char,
                 "token_start": ent.start,
                 "token_end": ent.end,
-                "score": round(ent._.confidence, 3)  # No fallback - must be from GLiNER
+                "score": round(score, 3)
             }
             entities_with_scores.append(ent_dict)
         

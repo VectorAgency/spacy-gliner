@@ -32,7 +32,7 @@ PLACEHOLDER_FORMATS = {
     "angles": "<{label}_{id}>",          # <PERSON_0>
     "double_angles": "<<{label}#{id}>>", # <<PERSON#0>>
     "curly": "{{{label}_{id}}}",         # {PERSON_0}
-    "custom": "***{label}_{id}***",      # ***PERSON_0***
+    "custom": "***{label}_{id}***"       # ***PERSON_0***
 }
 
 # Default format to use
@@ -42,4 +42,3 @@ DEFAULT_PLACEHOLDER_FORMAT = "brackets"
 DEFAULT_CHUNK_SIZE = 1400
 DEFAULT_OVERLAP = 200
 DEFAULT_THRESHOLD = 0.3
-MODEL_CACHE_PATH = "gliner_model_cache.pkl"
