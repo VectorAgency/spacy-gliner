@@ -6,17 +6,7 @@ import os
 import json
 from typing import List, Dict, Any, Optional
 from gliner import GLiNER
-
-
-# Configuration constants
-DEFAULT_LABELS = [
-    "person", "organization", "location", "country",
-    "email", "phone_number", "birthdate", "address"
-]
-
-DEFAULT_CHUNK_SIZE = 1400
-DEFAULT_OVERLAP = 200
-DEFAULT_THRESHOLD = 0.3
+from .config import DEFAULT_LABELS, DEFAULT_CHUNK_SIZE, DEFAULT_OVERLAP, DEFAULT_THRESHOLD
 
 # Global model cache (singleton pattern)
 _cached_model: Optional[GLiNER] = None

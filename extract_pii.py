@@ -11,7 +11,7 @@ import time
 from datetime import datetime
 from collections import defaultdict
 from pii_detector import create_pipeline, anonymize_doc
-from pii_detector.config import PLACEHOLDER_FORMATS
+from pii_detector.config import PLACEHOLDER_FORMATS, DEFAULT_PLACEHOLDER_FORMAT
 
 
 def format_metadata(metadata):
@@ -228,9 +228,9 @@ def main():
                         help='Output anonymized text with placeholders')
     parser.add_argument('--resolve-entities', action='store_true',
                         help='Resolve entity coreferences when anonymizing')
-    parser.add_argument('--placeholder-format', type=str, default='brackets',
+    parser.add_argument('--placeholder-format', type=str, default=DEFAULT_PLACEHOLDER_FORMAT,
                         choices=['brackets', 'angles', 'double_angles', 'curly', 'custom'],
-                        help='Placeholder format style (default: brackets)')
+                        help=f'Placeholder format style (default: {DEFAULT_PLACEHOLDER_FORMAT})')
     
     args = parser.parse_args()
     
@@ -246,19 +246,23 @@ def main():
     start_time = time.time()
     
     # Create pipeline
+    print(f"Loading model and creating pipeline...", file=sys.stderr)
+    pipeline_start = time.time()
     nlp = create_pipeline(
         language=args.language,
         threshold=args.threshold,
         filter_false_positives=args.filter,
         filter_file=args.filter_file
     )
+    pipeline_time = time.time() - pipeline_start
+    print(f"✓ Pipeline ready ({pipeline_time:.2f}s)", file=sys.stderr)
     
     # Process text
     print(f"Running spaCy pipeline: {nlp.pipe_names}", file=sys.stderr)
     processing_start = time.time()
     doc = nlp(text)
     processing_time = time.time() - processing_start
-    print(f"✓ Found {len(doc.ents)} entities", file=sys.stderr)
+    print(f"✓ Found {len(doc.ents)} entities ({processing_time:.2f}s)", file=sys.stderr)
     
     # Generate output based on mode
     if args.anonymize:
@@ -376,6 +380,7 @@ def main():
                 "total_tokens": len(tokens),
                 "total_sentences": len(sentences),
                 "text_length": len(text),
+                "model_loading_time_seconds": round(pipeline_time, 3),
                 "processing_time_seconds": round(processing_time, 3),
                 "anonymization_time_seconds": round(anonymization_time, 3),
                 "total_time_seconds": round(time.time() - start_time, 3)
