@@ -15,7 +15,7 @@ conda activate spacy-gliner
 # Standard spaCy JSON output
 python extract_pii.py --filter
 
-# Anonymize with basic placeholders
+# Anonymize with basic placeholders (outputs anonymized.txt + anonymized_meta.json)
 python extract_pii.py --anonymize --filter
 
 # Anonymize with entity resolution (groups "Anna" and "Anna Meier")
@@ -24,6 +24,10 @@ python extract_pii.py --anonymize --filter --resolve-entities
 # Use different placeholder formats
 python extract_pii.py --anonymize --filter --placeholder-format angles  # <PERSON_0>
 python extract_pii.py --anonymize --filter --placeholder-format double_angles  # <<PERSON#0>>
+
+# Specify custom output files
+python extract_pii.py --anonymize --filter --resolve-entities --output results
+# Creates: results.txt (anonymized text) and results_meta.json (metadata)
 ```
 
 ### Python API Usage
@@ -84,7 +88,9 @@ extract_pii.py         # CLI wrapper
 
 6. **Output Formats**:
    - Standard spaCy JSON (`doc.to_json()`)
-   - Anonymized text with entity mappings
+   - Dual file output for anonymization:
+     - `*.txt`: Clean anonymized text only
+     - `*_meta.json`: Comprehensive metadata with 15 categories of information
 
 7. **False Positive Filtering**: Optional filtering using `data/false_positives.json`
 
@@ -138,11 +144,12 @@ PLACEHOLDER_FORMATS = {
 ```
 
 ### Component Responsibilities
-- **detector.py**: spaCy component, chunking, GLiNER integration, confidence scores, case-insensitive filtering
-- **anonymizer.py**: Entity resolution with similarity threshold, span-based identity, cluster management
-- **fuzzy_matcher.py**: Pattern matching for possessives, case variations, typo detection with SequenceMatcher
+- **detector.py**: spaCy component, chunking, GLiNER integration, confidence scores, case-insensitive filtering, processing metadata tracking
+- **anonymizer.py**: Entity resolution with similarity threshold, span-based identity, cluster management, resolution decision logging
+- **fuzzy_matcher.py**: Pattern matching for possessives, case variations, typo detection with SequenceMatcher, fuzzy match metadata
 - **config.py**: Label mappings, placeholder formats (fixed syntax), configuration constants
 - **utils.py**: HuggingFace model caching, text chunking, O(n) deduplication
+- **extract_pii.py**: CLI wrapper, dual output (text + JSON metadata), comprehensive statistics calculation
 
 ### Configuration
 - Default threshold: 0.3 (adjustable via --threshold)
@@ -152,3 +159,21 @@ PLACEHOLDER_FORMATS = {
 - Similarity threshold: 0.8 for entity resolution, 0.85 for fuzzy matching
 - False positive filtering: Case-insensitive with O(1) set lookups
 - Placeholder formats: Configurable via --placeholder-format CLI arg
+
+### Metadata Output (JSON)
+The `*_meta.json` file contains 15 categories of detailed information:
+1. **Entity mapping**: Placeholder to original text mapping with confidence scores
+2. **Individual entity occurrences**: All detected entities with positions and scores
+3. **Entity clustering details**: How entities were grouped during resolution
+4. **Fuzzy match captures**: Variations found through fuzzy matching
+5. **Confidence score statistics**: Min/max/avg confidence per entity type
+6. **Processing configuration**: All settings used during processing
+7. **Entity type distribution**: Count and percentage of each entity type
+8. **Filtered false positives**: Entities removed by false positive filter
+9. **Processing statistics**: Timing, token counts, sentence counts
+10. **Overlapping entities removed**: Entities filtered due to overlap
+11. **Chunk boundaries**: Text chunking information for debugging
+12. **Entity density metrics**: Entities per sentence and per 100 tokens
+13. **Resolution decisions log**: Why entities were grouped together
+14. **Model information**: GLiNER model details and thresholds
+15. **Warning/anomaly flags**: Low confidence and unusually long entities

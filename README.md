@@ -12,7 +12,7 @@ A modular spaCy pipeline for PII detection and anonymization using GLiNER's stat
 - 🚀 **Efficient Processing**: Chunks large documents to avoid truncation
 - 🎯 **Configurable Filtering**: Remove false positives with customizable filter lists
 - 💾 **Model Caching**: Uses HuggingFace's built-in caching for reliability
-- 📊 **Multiple Output Formats**: spaCy JSON, anonymized text with entity mappings
+- 📊 **Multiple Output Formats**: spaCy JSON, dual output (anonymized text + metadata JSON)
 
 ## Installation
 
@@ -44,9 +44,11 @@ This intelligently groups entities: "Anna" and "Anna Meier" → `[PERSON_0]`
 
 ### Save output to file
 ```bash
-python extract_pii.py --anonymize --filter --resolve-entities --output results.json
+python extract_pii.py --anonymize --filter --resolve-entities --output results
 ```
-Saves the anonymized output to `results.json` instead of printing to stdout
+Creates two files:
+- `results.txt`: Clean anonymized text
+- `results_meta.json`: Comprehensive metadata (15 categories of information)
 
 
 ### Python API usage
@@ -60,7 +62,7 @@ nlp = create_pipeline(language="de", filter_false_positives=True)
 doc = nlp(text)
 
 # Basic anonymization
-anonymized_text, mapping = anonymize_doc(doc, resolve_entities=True)
+anonymized_text, mapping, metadata = anonymize_doc(doc, resolve_entities=True, return_metadata=True)
 
 # Custom label mapping (person → NAME, organization → COMPANY)
 label_mapping = {
@@ -68,10 +70,11 @@ label_mapping = {
     "organization": "COMPANY",
     "location": "PLACE"
 }
-anonymized_text, mapping = anonymize_doc(
+anonymized_text, mapping, metadata = anonymize_doc(
     doc, 
     label_mapping=label_mapping,
-    placeholder_format="<<{label}#{id}>>"  # → <<NAME#0>>
+    placeholder_format="<<{label}#{id}>>",  # → <<NAME#0>>
+    return_metadata=True
 )
 ```
 
@@ -134,19 +137,29 @@ Note: Filtering is now case-insensitive, so "Mutter", "mutter", and "MUTTER" wil
 }
 ```
 
-### 2. Anonymized Output (with entity resolution)
+### 2. Anonymized Output (dual file format)
+
+**File 1: anonymized.txt**
+```
+Name der Patientin: [PERSON_0]
+[PERSON_0] ist 15 Jahre alt...
+```
+
+**File 2: anonymized_meta.json**
 ```json
 {
-  "anonymized_text": "Name der Patientin: [PERSON_0]\n...",
   "entity_mapping": {
-    "[PERSON_0]": "Anna Meier",  // All "Anna" references map to PERSON_0
-    "[PERSON_1]": "Dr. med. Marco Weber",
-    "[ORGANIZATION_0]": "Gemeinschaftspraxis Bellevue"
+    "[PERSON_0]": {"text": "Anna Meier", "score": 0.95},
+    "[PERSON_1]": {"text": "Dr. med. Marco Weber", "score": 0.98}
   },
+  "clustering": [...],
+  "fuzzy_matches": [...],
+  "confidence_stats": {...},
   "statistics": {
     "total_entities": 41,
-    "entity_resolution": "enabled"
-  }
+    "processing_time_seconds": 1.23
+  },
+  // ... 10 more metadata categories
 }
 ```
 

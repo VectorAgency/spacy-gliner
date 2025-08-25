@@ -3,7 +3,7 @@ Fuzzy matching for catching entity variations not detected by GLiNER
 """
 
 import re
-from typing import List, Dict, Tuple, Set, Optional
+from typing import List, Dict, Tuple, Set, Optional, Union, Any
 from difflib import SequenceMatcher
 
 
@@ -147,8 +147,9 @@ def create_comprehensive_replacements(
     text: str,
     entities_by_type: Dict[str, List[str]],
     entity_to_placeholder: Dict[str, str],
-    replaced_spans: Optional[Set[Tuple[int, int]]] = None
-) -> str:
+    replaced_spans: Optional[Set[Tuple[int, int]]] = None,
+    return_matches: bool = False
+) -> Union[str, Tuple[str, List[Dict[str, Any]]]]:
     """
     Replace all entity variations with placeholders
     
@@ -157,9 +158,10 @@ def create_comprehensive_replacements(
         entities_by_type: Dict of entity type to list of entity texts
         entity_to_placeholder: Mapping from canonical entity text to placeholder
         replaced_spans: Set of (start, end) tuples indicating already replaced regions
+        return_matches: If True, also return list of fuzzy matches found
     
     Returns:
-        Text with all variations replaced
+        Text with all variations replaced, optionally with list of fuzzy matches
     """
     if replaced_spans is None:
         replaced_spans = set()
@@ -171,6 +173,8 @@ def create_comprehensive_replacements(
     
     # Filter out variations that overlap with already replaced spans
     filtered_variations = []
+    fuzzy_match_details = []
+    
     for start, end, matched_text, canonical_form in variations:
         # Check if this span overlaps with any already replaced region
         overlaps = False
@@ -181,6 +185,20 @@ def create_comprehensive_replacements(
         
         if not overlaps:
             filtered_variations.append((start, end, matched_text, canonical_form))
+            
+            # Collect fuzzy match metadata
+            if return_matches:
+                match_type = "possessive" if matched_text.lower().endswith('s') and not canonical_form.lower().endswith('s') else "case_variation"
+                if matched_text.lower() != canonical_form.lower() and not matched_text.lower().endswith('s'):
+                    match_type = "fuzzy_match"
+                
+                fuzzy_match_details.append({
+                    'matched_text': matched_text,
+                    'canonical_form': canonical_form,
+                    'position': {'start': start, 'end': end},
+                    'match_type': match_type,
+                    'placeholder': entity_to_placeholder.get(canonical_form, 'UNKNOWN')
+                })
     
     # Sort by position (reverse for replacement)
     filtered_variations = sorted(filtered_variations, key=lambda x: x[0], reverse=True)
@@ -191,4 +209,6 @@ def create_comprehensive_replacements(
             placeholder = entity_to_placeholder[canonical_form]
             text = text[:start] + placeholder + text[end:]
     
+    if return_matches:
+        return text, fuzzy_match_details
     return text

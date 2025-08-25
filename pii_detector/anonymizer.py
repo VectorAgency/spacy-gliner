@@ -2,7 +2,7 @@
 Anonymization and entity resolution for PII detection
 """
 
-from typing import Dict, List, Tuple, Optional, Set, Callable
+from typing import Dict, List, Tuple, Optional, Set, Callable, Any
 from collections import defaultdict
 from spacy.tokens import Doc, Span
 from .fuzzy_matcher import create_comprehensive_replacements
@@ -32,6 +32,7 @@ class EntityResolver:
     
     def __init__(self, similarity_threshold: float = 0.8):
         self.similarity_threshold = similarity_threshold
+        self.resolution_decisions = []  # Track resolution decisions
     
     def cluster_entities(self, entities: List[Span]) -> List[EntityCluster]:
         """Group entities that refer to the same real-world entity
@@ -105,6 +106,12 @@ class EntityResolver:
             
             # Rule 1: Exact match (case-insensitive)
             if ent_text.lower() == member_text.lower():
+                self.resolution_decisions.append({
+                    'entity': ent_text,
+                    'matched_with': member_text,
+                    'rule': 'exact_match',
+                    'similarity': 1.0
+                })
                 return True
             
             # Rule 2: Containment (for person names only)
@@ -114,6 +121,12 @@ class EntityResolver:
                     # Apply similarity threshold
                     jaccard = len(ent_tokens & member_tokens) / len(ent_tokens | member_tokens)
                     if jaccard >= self.similarity_threshold:
+                        self.resolution_decisions.append({
+                            'entity': ent_text,
+                            'matched_with': member_text,
+                            'rule': 'subset_match',
+                            'similarity': round(jaccard, 3)
+                        })
                         return True
         
         return False
@@ -130,7 +143,8 @@ def anonymize_doc(doc: Doc,
                   label_mapping: Optional[Dict[str, str]] = None,
                   placeholder_format: str = None,
                   include_scores: bool = False,
-                  use_fuzzy_matching: bool = True) -> Tuple[str, Dict[str, str]]:
+                  use_fuzzy_matching: bool = True,
+                  return_metadata: bool = False) -> Tuple[str, Dict[str, str], Optional[Dict[str, Any]]]:
     """Anonymize a spaCy Doc by replacing entities with placeholders
     
     Args:
@@ -140,10 +154,12 @@ def anonymize_doc(doc: Doc,
         placeholder_format: Format string for placeholders (uses config default if None)
         include_scores: Whether to include confidence scores in the mapping
         use_fuzzy_matching: Whether to use fuzzy matching to catch all variations
+        return_metadata: Whether to return detailed metadata about the anonymization process
     
     Returns:
-        Tuple of (anonymized text, mapping of placeholders to original values)
+        Tuple of (anonymized text, mapping of placeholders to original values, optional metadata)
         If include_scores=True, mapping values will be dicts with 'text' and 'score' keys
+        If return_metadata=True, third element contains clustering and fuzzy matching details
     
     Examples:
         placeholder_format="[{label}_{id}]" → [PERSON_0]
@@ -157,8 +173,14 @@ def anonymize_doc(doc: Doc,
     # Use default label mapping if not specified
     if label_mapping is None:
         label_mapping = LABEL_MAPPING
+    
+    # Initialize metadata collection
+    metadata = {} if return_metadata else None
+    
     if not doc.ents:
-        return doc.text, {}
+        if return_metadata:
+            return doc.text, {}, {'clusters': [], 'fuzzy_matches': []}
+        return doc.text, {}, None
     
     # Build clusters of entities
     if resolve_entities:
@@ -167,6 +189,19 @@ def anonymize_doc(doc: Doc,
         
         # Sort clusters by first appearance for deterministic IDs
         clusters.sort(key=lambda c: c.first_position)
+        
+        # Collect clustering metadata
+        if return_metadata:
+            metadata['resolution_decisions'] = resolver.resolution_decisions
+            metadata['clusters'] = []
+            for cluster in clusters:
+                cluster_info = {
+                    'label': cluster.label,
+                    'canonical': cluster.canonical,
+                    'members': [m.text for m in cluster.members],
+                    'first_position': cluster.first_position
+                }
+                metadata['clusters'].append(cluster_info)
         
         # Group clusters by label and assign IDs
         clusters_by_label = defaultdict(list)
@@ -286,17 +321,29 @@ def anonymize_doc(doc: Doc,
                                  for k, v in entities_by_type.items()}
         
         # Create comprehensive replacements with safety check
-        text = create_comprehensive_replacements(
-            text,
-            entities_by_type_list,
-            canonical_to_placeholder,
-            replaced_spans=replaced_spans  # Pass already replaced regions
-        )
+        if return_metadata:
+            text, fuzzy_matches = create_comprehensive_replacements(
+                text,
+                entities_by_type_list,
+                canonical_to_placeholder,
+                replaced_spans=replaced_spans,  # Pass already replaced regions
+                return_matches=True
+            )
+            metadata['fuzzy_matches'] = fuzzy_matches
+        else:
+            text = create_comprehensive_replacements(
+                text,
+                entities_by_type_list,
+                canonical_to_placeholder,
+                replaced_spans=replaced_spans  # Pass already replaced regions
+            )
     
-    return text, placeholder_to_original
+    if return_metadata:
+        return text, placeholder_to_original, metadata
+    return text, placeholder_to_original, None
 
 
-def create_anonymizer(resolve_entities: bool = True) -> Callable[[Doc], Tuple[str, Dict[str, str]]]:
+def create_anonymizer(resolve_entities: bool = True) -> Callable[[Doc], Tuple[str, Dict[str, str], Optional[Dict[str, Any]]]]:
     """Create an anonymizer function with configuration
     
     Args:
@@ -305,7 +352,7 @@ def create_anonymizer(resolve_entities: bool = True) -> Callable[[Doc], Tuple[st
     Returns:
         Configured anonymizer function
     """
-    def anonymizer(doc: Doc) -> Tuple[str, Dict[str, str]]:
+    def anonymizer(doc: Doc) -> Tuple[str, Dict[str, str], Optional[Dict[str, Any]]]:
         return anonymize_doc(doc, resolve_entities=resolve_entities)
     
     return anonymizer
