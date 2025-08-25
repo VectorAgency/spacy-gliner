@@ -16,13 +16,13 @@ DEFAULT_LABELS = [
 
 # Map internal labels to custom anonymization placeholders
 LABEL_MAPPING = {
-    "person": "NAME",
+    "person": "PERSON",
     "organization": "COMPANY",
     "location": "PLACE",
     "country": "COUNTRY",
     "email": "EMAIL",
     "phone_number": "PHONE",
-    "birthdate": "DOB",
+    "birthdate": "BIRTHDATE",
     "address": "ADDRESS"
 }
 
