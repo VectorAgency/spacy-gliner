@@ -14,7 +14,7 @@ GLINER_MODEL_NAME = "urchade/gliner_multi_pii-v1"
 # Entity types detected by GLiNER
 DEFAULT_LABELS = [
     "person",
-    "organization", 
+    "organization_name", 
     "location",
     "country",
     "email",
